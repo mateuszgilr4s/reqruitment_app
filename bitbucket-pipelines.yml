@@ -1,0 +1,28 @@
+image: docker/compose:1.24.1
+
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          caches:
+            - docker
+          services:
+            - docker
+          script:
+            - docker-compose -f docker/test/docker-compose-lint.yml -p lint$BITBUCKET_COMMIT up --abort-on-container-exit
+          after-script:
+            - docker-compose -f docker/test/docker-compose-lint.yml -p lint$BITBUCKET_COMMIT down
+  default:
+    - step:
+        image: alpine/git
+        script:
+          - echo $CodeCommitKey > ~/.ssh/codecommit_rsa.tmp
+          - base64 -d ~/.ssh/codecommit_rsa.tmp > ~/.ssh/codecommit_rsa
+          - chmod 400 ~/.ssh/codecommit_rsa
+          - echo $CodeCommitConfig > ~/.ssh/config.tmp
+          - base64 -d  ~/.ssh/config.tmp > ~/.ssh/config
+          - set +e
+          - ssh -o StrictHostKeyChecking=no $CodeCommitHost
+          - set -e
+          - git remote set-url origin ssh://$CodeCommitRepo
+          - git push origin $BITBUCKET_BRANCH --force
